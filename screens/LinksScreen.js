@@ -2,9 +2,6 @@ import * as React from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, FlatList } from 'react-native';
 import * as SQLite from 'expo-sqlite';
 
-// Open local db
-const db = SQLite.openDatabase("db.db");
-
 function FlatListItemSeparator () {
   return (
     <View style={{
@@ -19,8 +16,12 @@ function FlatListItemSeparator () {
 function renderItem (data) {
   return (
     <TouchableOpacity style={styles.itemList}>
-      <Text style={styles.itemText}>Tipo: {data.item.id}</Text>
-      <Text style={styles.itemText}>Desc.:{data.item.value}</Text>
+      <Text style={styles.itemText}>Tipo: {data.item.tipo}</Text>
+      <Text style={styles.itemText}>Desc.:{data.item.desc}</Text>
+      <Text style={styles.itemText}>Contato: {data.item.contato}</Text>
+      <Text style={styles.itemText}>Telefone: {data.item.telefone}</Text>
+      <Text style={styles.itemText}>Data: {data.item.data}</Text>
+      <Text style={styles.itemText}>Técnico: {data.item.tecnico}</Text>
     </TouchableOpacity>
   );
 }
@@ -28,20 +29,10 @@ function renderItem (data) {
 export default function LinksScreen () {
   const [items, setItems] = React.useState(null);
 
-  React.useEffect(() => {
-    db.transaction(tx => {
-      tx.executeSql(
-        `select * from items where done = ?;`,
-        [0],
-        (_, { rows: { _array } }) => setItems(_array)
-      );
-    });
-  }, []);
-
   return (
     <View>
       <FlatList
-        data= {items}
+        data= {dataSource}
         ItemSeparatorComponent = {FlatListItemSeparator}
         renderItem= {item=> renderItem(item)}
         keyExtractor= {item=>item.id.toString()}
