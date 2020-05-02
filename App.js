@@ -1,99 +1,83 @@
-import React from 'react';
-import { Image, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import * as ImagePicker from 'expo-image-picker';
-import * as Sharing from 'expo-sharing';
-import uploadToAnonymousFilesAsync from 'anonymous-files';
+import * as React from 'react';
+import { Platform, StatusBar, StyleSheet, View } from 'react-native';
+import { SplashScreen } from 'expo';
+import * as Font from 'expo-font';
+import { Ionicons } from '@expo/vector-icons';
+import { NavigationContainer } from '@react-navigation/native';
+import { createStackNavigator } from '@react-navigation/stack';
+import BottomTabNavigator from './navigation/BottomTabNavigator';
+import useLinking from './navigation/useLinking';
+import AdminServicos from './screens/AdminServicos';
+import AdminTecnicos from './screens/AdminTecnicos';
+import * as SQLite from 'expo-sqlite';
 
-export default function App() {
-  const [selectedImage, setSelectedImage] = React.useState(null);
-  let openImagePickerAsync = async () => {
-    let permissionResult = await ImagePicker.requestCameraRollPermissionsAsync();
+const Stack = createStackNavigator();
 
-    if (permissionResult.granted === false) {
-      alert("É necessário permissão para acessar a câmera!");
-      return;
-    }
+// Open local db
+const db = SQLite.openDatabase("db.db");
 
-    let pickerResult = await ImagePicker.launchImageLibraryAsync();
-    if (pickerResult.cancelled === true) {
-      return;
-    }
-
-    if (Platform.OS === 'web') {
-      let remoteUri = await uploadToAnonymousFilesAsync(pickerResult.uri);
-      setSelectedImage({ localUri: pickerResult.uri, remoteUri });
-    } else {
-      setSelectedImage({ localUri: pickerResult.uri, remoteUri: null });
-    } 
-  }
-
-  let openShareDialogAsync = async () => {
-    if (!(await Sharing.isAvailableAsync())) {
-      alert(`A imagem está disponível para ser compartilhara em: ${selectedImage.remoteUri}`);
-      return;
-    }
-
-    Sharing.shareAsync(selectedImage.remoteUri || selectedImage.localUri);
-  };
+export default function App(props) {
+  const [isLoadingComplete, setLoadingComplete] = React.useState(false);
+  const [initialNavigationState, setInitialNavigationState] = React.useState();
+  const containerRef = React.useRef();
+  const { getInitialState } = useLinking(containerRef);
   
-  if (selectedImage !== null) {
+  // Create local db
+  React.useEffect(() => {
+    db.transaction(tx => {
+      tx.executeSql(
+        "create table if not exists items (id integer primary key not null, done int, value text);"
+      );
+    });
+  }, [])
+
+  // Load any resources or data that we need prior to rendering the app
+  React.useEffect(() => {
+    async function loadResourcesAndDataAsync() {
+      try {
+        SplashScreen.preventAutoHide();
+
+        // Load our initial navigation state
+        setInitialNavigationState(await getInitialState());
+
+        // Load fonts
+        await Font.loadAsync({
+          ...Ionicons.font,
+          'space-mono': require('./assets/fonts/SpaceMono-Regular.ttf'),
+        });
+      } catch (e) {
+        // We might want to provide this error information to an error reporting service
+        console.warn(e);
+      } finally {
+        setLoadingComplete(true);
+        SplashScreen.hide();
+      }
+    }
+
+    loadResourcesAndDataAsync();
+  }, []);
+
+  if (!isLoadingComplete && !props.skipLoadingScreen) {
+    return null;
+  } else {
     return (
       <View style={styles.container}>
-        <Image source={{ uri: selectedImage.localUri }}
-          style={styles.thumbnail}
-        />
-        <TouchableOpacity onPress={openShareDialogAsync} style={styles.button}>
-          <Text style={styles.buttonText}>Share this photo</Text>
-        </TouchableOpacity>
+        {Platform.OS === 'ios' && <StatusBar barStyle="default" />}
+        <NavigationContainer ref={containerRef} initialState={initialNavigationState}>
+          <Stack.Navigator>
+            <Stack.Screen name="Root" component={BottomTabNavigator} />
+            <Stack.Screen name="AdminTecnicos" component={AdminTecnicos} />
+            <Stack.Screen name="AdminServicos" component={AdminServicos} title="Cadastro de Tipos de Serviço"/>
+          </Stack.Navigator>
+        </NavigationContainer>
       </View>
     );
   }
-  
-  return (
-    <View style={styles.container}>
-      <Image source={{ uri: 'https://i.imgur.com/TkIrScD.png' }} style={styles.logo} />
-      <Text style={styles.instructions}>
-        Para compartilhar uma foto do seu telefone com um amigo, basta pressionar o botão abaixo!
-      </Text>
-
-      <TouchableOpacity onPress={openImagePickerAsync} style={styles.button}>
-        <Text style={styles.buttonText}>Escolha uma foto</Text>
-      </TouchableOpacity>
-    </View>
-  );
-
 }
 
 const styles = StyleSheet.create({
-  thumbnail: {
-    width: 300,
-    height: 300,
-    resizeMode: "contain"
-  },
   container: {
     flex: 1,
     backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
-  logo: {
-    width: 305,
-    height: 159,
-    marginBottom: 20,
-  },
-  instructions: {
-    color: '#888',
-    fontSize: 18,
-    marginHorizontal: 15,
-    marginBottom: 10,
-  },
-  button: {
-    backgroundColor: "blue",
-    padding: 20,
-    borderRadius: 5,
-  },
-  buttonText: {
-    fontSize: 20,
-    color: '#fff',
-  }
 });
